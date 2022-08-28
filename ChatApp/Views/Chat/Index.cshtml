@@ -1,0 +1,179 @@
+﻿@using ChatApp.Models.Data
+@model ChatApp.Models.ViewModel.UserChatVM
+@{
+    ViewData["Title"] = "Chat Page";
+}
+
+<div class="container bootstrap snippets bootdey">
+    <div class="row">
+        <div class="col-md-4 bg-white ">
+            <div class=" row border-bottom padding-sm" style="height: 40px;">
+                <div class="h4">Member</div>
+            </div>
+
+            <!-- =============================================================== -->
+            <!-- member list -->
+            <ul class="friend-list" id="notify">
+                @foreach (var item in Model.Chats)
+                {
+                    <li class="active bounceInDown">
+                        <a class="clearfix" asp-all-route-data='new Dictionary<string,string> { { "UserId", Model.CurrentUser.Id.ToString() }, {"ChatId", @item.Id.ToString() }}'>
+                            <img src="https://bootdey.com/img/Content/user_1.jpg" alt="" class="img-circle">
+                            <div class="friend-name">
+                                <strong>@item.Title</strong>
+                            </div>
+                        </a>
+                    </li>
+                }
+                <li>
+                    <a class="clearfix" asp-all-route-data='new Dictionary<string,string> { { "UserId", "1" }, {"ChatId", "2" }}'>
+                        <div class="friend-name">
+                            <strong>Log as User 1</strong>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a class="clearfix" asp-all-route-data='new Dictionary<string,string> { { "UserId", "2" }, {"ChatId", "2" }}'>
+                        <div class="friend-name">
+                            <strong>Log as User 2</strong>
+                        </div>
+                    </a>
+                </li>
+                <li>
+                    <a class="clearfix" asp-all-route-data='new Dictionary<string,string> { { "UserId", "3" }, {"ChatId", "2" }}'>
+                        <div class="friend-name">
+                            <strong>Log as User 3</strong>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!--=========================================================-->
+        <!-- selected chat -->
+        <div class="col-md-8 bg-white ">
+            <div class="chat-message scroller" style="padding-bottom:40px;">
+                <ul class="chat" id="chat_message">
+                    @foreach (var message in Model.SelectedChat.Messages)
+                    {
+                        var messageSide = "right";
+                        if (message.UserId != Model.CurrentUser.Id)
+                        {
+                            messageSide = "left";
+                        }
+                        <li class="@messageSide clearfix right-click-area">
+                            <div>
+                                <span class="chat-img pull-@messageSide">
+                                    <img src="https://bootdey.com/img/Content/user_3.jpg" alt="User Avatar">
+                                </span>
+                                <div class="chat-body clearfix">
+                                    <div class="header">
+                                        <strong class="primary-font">@message.User.Email</strong>
+                                        <small class="pull-right text-muted"><i class="fa fa-clock-o"></i>@message.CreatedDate</small>
+                                    </div>
+                                    <p>
+                                        @message.Body
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                    <li id="message-bottom"></li>
+                </ul>
+            </div>
+            <div class="chat-box bg-white p-0">
+                <div class="input-group">
+                    <form method="post" class="form-control border-0 p-0">
+                        <input name="messageType" class="message_items" hidden="true" value="NORMAL" />
+                        <input name="chatId" class="message_items" type="number" hidden="true" value="@Model.SelectedChat.Id" />
+                        <input name="userId" class="message_items" type="number" hidden="true" value="@Model.CurrentUser.Id" />
+                        <div class="input-group-btn d-flex flex-row">
+                            <input name="body" class="message_items form-control border no-shadow no-rounded" placeholder="Type your message here">
+                            <button type="submit" id="submitForm" class="btn btn-success no-rounded" type="button">Send</button>
+                        </div>
+                    </form>
+                </div><!-- /input-group -->
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+<script>
+        (
+        function () {
+
+
+        $('#message-bottom')[0].scrollIntoView();
+
+        const hubConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/Messanger")
+            .build();
+        let connectionId = "";
+
+        const forms = document.querySelectorAll("form");
+        forms.forEach(form => {
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var formData = new FormData(this);
+                formData.append("connection", connectionId)
+                fetch("/Chat/SendMessage", {
+                    method: "POST",
+                    body: formData
+                })
+                    .catch(error => console.error("Error: ", error));
+            });
+        });
+
+        hubConnection.start().then(() => {
+            // после соединения получаем id подключения
+            console.log(hubConnection.connectionId);
+            connectionId = hubConnection.connectionId;
+        });
+
+        // получение сообщения от сервера
+        hubConnection.on("Notify", function (messageObj) {
+
+            var currentUserMail = '@Model.CurrentUser.Email';
+            var obj = JSON.parse(messageObj);
+
+            if (@Model.SelectedChat.Id == obj.ChatId)
+            {
+                let classMessage = "pull-left";
+                let classLi = "left";
+                let avatar = "https://bootdey.com/img/Content/user_3.jpg";
+                let senderMail = obj.User.Email;
+
+                if (senderMail == currentUserMail)
+                {
+                    avatar = "https://bootdey.com/img/Content/user_1.jpg";
+                    classMessage = "pull-right";
+                    classLi = "right";
+                }
+
+                let date = new Date(obj.CreatedDate);
+                let outputDate = date.toLocaleDateString('en-us') + " " + date.toLocaleTimeString('en-US');
+                let elem = `
+                <li class="${classLi} clearfix">
+                    <span class="chat-img ${classMessage}">
+                        <img src="${avatar}" alt="User Avatar">
+                    </span>
+                    <div class="chat-body clearfix">
+                        <div class="header">
+                            <strong class="primary-font">${senderMail}</strong>
+                            <small class="pull-right text-muted"><i class="fa fa-clock-o"></i>${outputDate}</small>
+                        </div>
+                        <p>
+                            ${obj.Body}
+                        </p>
+                    </div>
+                </li>`;
+                document.getElementById("chat_message").innerHTML += elem;
+                document.getElementById("chat_message").lastChild.scrollIntoView();
+            }
+        });
+
+    })()
+</script>
+}
